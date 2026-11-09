@@ -44,3 +44,19 @@ def health():
     return {"status": "ok", "data_dir": str(get_config().data_dir), "simulated": True}
 
 
+# Serve the built React app (frontend/dist) from the same origin when it exists.
+# Windows can map .js to text/plain via the registry, and browsers refuse such module scripts.
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
+_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+if (_DIST / "index.html").is_file():
+    app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        if path.startswith("api/"):
+            raise HTTPException(404, "not found")
+        candidate = (_DIST / path).resolve()
+        if path and _DIST.resolve() in candidate.parents and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_DIST / "index.html")
