@@ -10,6 +10,10 @@ os.environ["PLATFORM_AUTOSCAN"] = "0"
 os.environ["PLATFORM_INLINE_JOBS"] = "1"
 os.environ["PLATFORM_STEP_DELAY"] = "0"
 os.environ["PLATFORM_RETRY_BACKOFF"] = "0"
+# Generous limits so ordinary tests never trip; test_security.py lowers them explicitly.
+os.environ["PLATFORM_RATE_LIMIT_READ"] = "100000"
+os.environ["PLATFORM_RATE_LIMIT_WRITE"] = "100000"
+os.environ["PLATFORM_RATE_LIMIT_DOWNLOAD"] = "100000"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -25,6 +29,8 @@ def clean_env():
         shutil.rmtree(d, ignore_errors=True)
     cfg.ensure_dirs()
     reset_db()
+    from app.services.ratelimit import limiter
+    limiter.reset()
     yield
 
 

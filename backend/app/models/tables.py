@@ -214,4 +214,24 @@ class ActivityLog(Base):
     sample_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 
+class AuditLog(Base):
+    """Append-only record of API activity. Rows form a hash chain (``row_hash`` covers
+    ``prev_hash``) so edits or deletions are detectable via /api/audit/verify."""
+    __tablename__ = "audit_log"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    request_id: Mapped[str] = mapped_column(String(64), index=True)
+    actor: Mapped[str] = mapped_column(String(64), default="anonymous")   # claimed via X-Actor; there is no auth
+    client_ip: Mapped[str] = mapped_column(String(64))
+    method: Mapped[str] = mapped_column(String(8))
+    route: Mapped[str] = mapped_column(String(200))     # route template, e.g. /api/samples/{sample_id}/base-recall
+    path: Mapped[str] = mapped_column(String(500))
+    resource: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    status_code: Mapped[int] = mapped_column(Integer, index=True)
+    outcome: Mapped[str] = mapped_column(String(16), index=True)        # SUCCESS|REJECTED|DENIED|RATE_LIMITED|ERROR
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    prev_hash: Mapped[str] = mapped_column(String(64), default="")
+    row_hash: Mapped[str] = mapped_column(String(64), default="")
+
+
 Index("ix_attempt_sample_no", ProcessingAttempt.sample_id, ProcessingAttempt.attempt_no, unique=True)

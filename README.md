@@ -76,6 +76,13 @@ Once a run has the marker, its files are immutable through the API (uploads retu
 
 `GET/POST /api/runs`, `GET /api/runs/{id}`, `POST /api/sequencer/scan`, `GET /api/sequencer/status`, `GET /api/s3/objects`, `GET /api/metadata/search`, `GET /api/workflows`, `GET /api/workflows/{job_id}`, `POST /api/workflows/{run_id}/execute`, `POST /api/samples/{id}/catalogue/update`, `POST /api/samples/{id}/base-recall`, `GET /api/samples/{id}/history`, `GET /api/qc/results`, `GET /api/downstream/available`, `GET /api/downstream/{id}/fetch`.
 
+## Rate limiting and audit logging
+
+* **Rate limiting** (in-memory sliding window per client IP, `app/middleware.py`): separate buckets for reads (600/min), writes (60/min) and downstream fetch/download (30/min). Over the limit -> `429` with `Retry-After`, `X-RateLimit-Limit/Remaining`. `/api/health` and static files are exempt. `X-Forwarded-For` is ignored on purpose (clients could spoof it). Tune with `PLATFORM_RATE_LIMIT=0|1`, `PLATFORM_RATE_LIMIT_READ|WRITE|DOWNLOAD`, `PLATFORM_RATE_LIMIT_WINDOW`. State is per process and resets on restart.
+* **Audit log** (`audit_log` table, `GET /api/audit`, filters: `outcome`, `method`, `actor`, `resource`, `status_code`): records every state-changing call, every downstream fetch/download, and every denied (401/403), rate-limited (429) or failed (5xx) call, with request id (`X-Request-ID`, generated if absent), route template, resource id, status, outcome and duration. Request bodies and query strings are never stored. Routine polling GETs are not audited.
+* **Tamper evidence**: rows are hash-chained; `GET /api/audit/verify` re-computes the chain and reports the first bad row. This detects edits/deletions through the database, but not someone who rewrites the whole chain.
+* **No authentication exists**, so `actor` is whatever the client sends in `X-Actor` (sanitised) and is *not trustworthy*; `client_ip` is the socket peer. A failed audit write is logged to `platform.log` and does not fail the request.
+
 ## Tests
 
 ```powershell
@@ -83,7 +90,7 @@ cd backend
 .\.venv\Scripts\python -m pytest
 ```
 
-30 tests cover: folder discovery, duplicate detection, incomplete folders, initial ingestion, catalogue update, base-recall rerun, S3 overwrite, NFS-unchanged, FastQC PASS/FAIL, warning policy, downstream restriction (incl. guessed download URLs), stale-result protection, transient retry, permanent failure, crash recovery, path traversal, and state-machine / double-claim guards.
+40 tests cover: folder discovery, duplicate detection, incomplete folders, initial ingestion, catalogue update, base-recall rerun, S3 overwrite, NFS-unchanged, FastQC PASS/FAIL, warning policy, downstream restriction (incl. guessed download URLs), stale-result protection, transient retry, permanent failure, crash recovery, path traversal, state-machine / double-claim guards, rate limiting, and audit trail + tamper detection.
 
 ## Limitations
 

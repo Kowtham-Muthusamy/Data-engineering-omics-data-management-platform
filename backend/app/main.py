@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import router as api_router
 from app.config import get_config
 from app.database import init_db
+from app.middleware import RequestGuardMiddleware
 from app.workers import job_runner
 from app.workers.scan_loop import scan_loop
 
@@ -35,7 +36,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-                   allow_methods=["*"], allow_headers=["*"])
+                   allow_methods=["*"], allow_headers=["*"],
+                   expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"])
+app.add_middleware(RequestGuardMiddleware)
 app.include_router(api_router)
 
 

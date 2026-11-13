@@ -27,6 +27,11 @@ class AppConfig(BaseModel):
     max_workers: int = 2
     max_retries: int = 3           # retries for transient step errors
     retry_backoff: float = 0.3     # seconds, doubled on each retry
+    rate_limit_enabled: bool = True
+    rate_limit_window: float = 60.0      # seconds (sliding window)
+    rate_limit_read: int = 600           # GET/HEAD per client per window (the UI polls)
+    rate_limit_write: int = 60           # POST/PUT/PATCH/DELETE per client per window
+    rate_limit_download: int = 30        # downstream fetch/download per client per window
 
     @property
     def nfs_dir(self) -> Path:
@@ -61,6 +66,11 @@ def get_config() -> AppConfig:
         step_delay=float(os.environ.get("PLATFORM_STEP_DELAY", "0.6")),
         inline_jobs=_flag("PLATFORM_INLINE_JOBS", False),
         retry_backoff=float(os.environ.get("PLATFORM_RETRY_BACKOFF", "0.3")),
+        rate_limit_enabled=_flag("PLATFORM_RATE_LIMIT", True),
+        rate_limit_window=float(os.environ.get("PLATFORM_RATE_LIMIT_WINDOW", "60")),
+        rate_limit_read=int(os.environ.get("PLATFORM_RATE_LIMIT_READ", "600")),
+        rate_limit_write=int(os.environ.get("PLATFORM_RATE_LIMIT_WRITE", "60")),
+        rate_limit_download=int(os.environ.get("PLATFORM_RATE_LIMIT_DOWNLOAD", "30")),
     )
     cfg.ensure_dirs()
     return cfg
